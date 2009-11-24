@@ -25,7 +25,7 @@ def OnDocumentChanged(properties, context):
   logging.debug('Document changed')
   blip_id = properties['blipId']
   blip = context.GetBlipById(blip_id)
-  if blip.GetDocument().HasAnnotation('brainy-robot.brainfuck'):
+  if blip.document.HasAnnotation('brainy-robot.brainfuck'):
     UpdateProgram(blip, context) 
   else:
     HandleNewProgram(blip, context)
@@ -38,6 +38,7 @@ def HandleNewProgram(root_blip, context):
     id = uuid.uuid4().urn
     root_blip.GetDocument().AnnotateDocument('brainy-robot.brainfuck',id);
     inline_blip = root_blip.GetDocument().AppendInlineBlip()
+    logging.debug('inline blip id %s' % inline_blip.blipId)
     doc = inline_blip.GetDocument()
     doc.SetText(result)
     doc.AnnotateDocument('brainy-robot.result',id);
@@ -51,7 +52,7 @@ def UpdateProgram(blip, context):
     #if child_blip.document.HasAnnotation('brainy-robot.result'):
     if child_blip.creator == 'brainy-robot@appspot.com':
       logging.debug('annotation found')
-      result = brainfuck(child_blip.document.GetText())
+      result = brainfuck(blip.document.GetText())
       logging.debug('updated brainfuck result: %s ' % result)
       child_blip.document.SetText(result)
 
