@@ -38,10 +38,9 @@ def HandleNewProgram(root_blip, context):
     id = uuid.uuid4().urn
     root_blip.GetDocument().AnnotateDocument('brainy-robot.brainfuck',id);
     inline_blip = root_blip.GetDocument().AppendInlineBlip()
-    logging.debug('inline blip id %s' % inline_blip.blipId)
-    doc = inline_blip.GetDocument()
-    doc.SetText(result)
-    doc.AnnotateDocument('brainy-robot.result',id);
+    inline_blip.document.SetText(result)
+    for bid in root_blip.GetChildBlipIds():
+      context.GetBlipById(bid).document.AnnotateDocument('brainy-robot.result',id);
 
 def UpdateProgram(blip, context):
   logging.debug('update program')
