@@ -1,6 +1,7 @@
 #!/usr/bin/python2.5
 
 import logging
+import uuid
 
 from waveapi import events
 from waveapi import model
@@ -14,42 +15,56 @@ NUM_CELLS = 30000
 CELL_SIZE = 1
 
 def OnBlipSubmitted(properties, context):
-  """Invoked when any blip we are interested in is submitted."""
+  logging.debug('Blip submitted')
+
   blip_id = properties['blipId']
   blip = context.GetBlipById(blip_id)
-  if blip.IsRoot():
-    HandleRootBlip(blip, context)
-  #else:
-  #  HandleChildBlip(blip)
+  HandleRootBlip(blip, context)
 
-def HandleRootBlip(root_blip, context):
-  """Runs the contents of the root blip as a Brainfuck program."""
+def OnDocumentChanged(properties, context):
+  logging.debug('Document changed')
+  blip_id = properties['blipId']
+  blip = context.GetBlipById(blip_id)
+  if blip.GetDocument().HasAnnotation('brainy-robot.brainfuck'):
+    UpdateProgram(blip, context) 
+  else:
+    HandleNewProgram(blip, context)
+
+def HandleNewProgram(root_blip, context):
+  logging.debug('handle new program')
   result = brainfuck(root_blip.GetDocument().GetText())
-  comm_blip = None
-  for blip_id in root_blip.GetChildBlipIds():
-    blip = context.GetBlipById(blip_id)
-    if blip.GetDocument().HasAnnotation('blip-comm'):
-      comm_blip = blip
-      break
-  if comm_blip:
-    comm_blip.GetDocument().SetText(result)
+  logging.debug('brainfuck result: %s ' % result)
+  if result:
+    id = uuid.uuid4().urn
+    root_blip.GetDocument().AnnotateDocument('brainy-robot.brainfuck',id);
+    inline_blip = root_blip.GetDocument().AppendInlineBlip()
+    doc = inline_blip.GetDocument()
+    doc.SetText(result)
+    doc.AnnotateDocument('brainy-robot.result',id);
 
-def OnSelfAdded(properties, context):
-    """Invoked when Brainy is first added to the wave."""
-    wavelet = context.GetRootWavelet()
-    blip = context.GetBlipById(wavelet.GetRootBlipId())
-    if blip:
-        inline_blip = blip.GetDocument().AppendInlineBlip()
-        doc = inline_blip.GetDocument()
-        doc.SetText('Hello! I\'m Brainy. Please input your program below '
-                'and I will take care of the rest.')
-        doc.AnnotateDocument('blip-comm', '1')
+def UpdateProgram(blip, context):
+  logging.debug('update program')
+  #id = blip.GetDocument().GetAnnotation('brainy-robot.brainfuck')
+  for child_id in blip.childBlipIds:
+    logging.debug('child %s' % child_id)
+    child_blip = context.GetBlipById(child_id)
+    #if child_blip.document.HasAnnotation('brainy-robot.result'):
+    if child_blip.creator == 'brainy-robot@appspot.com':
+      logging.debug('annotation found')
+      result = brainfuck(child_blip.document.GetText())
+      logging.debug('updated brainfuck result: %s ' % result)
+      child_blip.document.SetText(result)
+
+def OnRobotAdded(properties, context):
+  root_wavelet = context.GetRootWavelet()
+  root_wavelet.CreateBlip().document.SetText("Hello, I\'m Brainy. Every brainfuck program that you write in a blip will be translated by me. See http://de.wikipedia.org/wiki/Brainfuck")
 
 if __name__ == '__main__':
-    brainy = robot.Robot(ROBOT_NAME.capitalize(),
-            version='1',
-            image_url='http://manu.appspot.com/assets/%s.jpg' % ROBOT_NAME,
-            profile_url='http://manu.appspot.com')
-    brainy.RegisterHandler(events.WAVELET_SELF_ADDED, OnSelfAdded)
-    brainy.RegisterHandler(events.BLIP_SUBMITTED, OnBlipSubmitted)
-    brainy.Run(debug=True)
+  brainy = robot.Robot(ROBOT_NAME.capitalize(),
+    version='1',
+    image_url='http://brainy-robot.appspot.com/assets/%s.jpg' % ROBOT_NAME,
+    profile_url='http://brainy-robot.appspot.com')
+  brainy.RegisterHandler(events.WAVELET_SELF_ADDED, OnRobotAdded)
+  brainy.RegisterHandler(events.DOCUMENT_CHANGED, OnDocumentChanged)
+  #brainy.RegisterHandler(events.BLIP_SUBMITTED, OnBlipSubmitted)
+  brainy.Run(debug=True)
